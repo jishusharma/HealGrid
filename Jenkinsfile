@@ -1,3 +1,13 @@
+@NonCPS
+def parseRerunTests(String reportText) {
+    def json = new groovy.json.JsonSlurper().parseText(reportText)
+    return json.clusters
+        .findAll { it.decision == 'RERUN' }
+        .collectMany { it.tests }
+        .unique()
+        .join(',')
+}
+
 pipeline {
     agent any
     environment {
@@ -73,6 +83,8 @@ pipeline {
                 sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit healenium selector-imitator selenium-hub chrome firefox test-runner'
                 sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
                 sh 'ls -la target/surefire-reports/'
+                sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
+                sh 'ls -la target/allure-results/'
             }
         }
         stage('AI Failure Analysis') {

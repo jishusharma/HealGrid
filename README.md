@@ -4,7 +4,6 @@ A Java test automation framework built around execution reliability and observab
 Covers API, Selenium Grid, and Mobile Web from a single codebase — with self-healing locators,
 AI-driven failure classification, and historical test health tracking via PostgreSQL.
 
-[![Build Status](https://canon-anymore-maturity.ngrok-free.dev/buildStatus/icon?job=HealGrid-Pipeline&ngrok-skip-browser-warning=true)](https://canon-anymore-maturity.ngrok-free.dev/job/HealGrid-Pipeline/)
 ![Java](https://img.shields.io/badge/Java-17-blue)
 ![Selenium](https://img.shields.io/badge/Selenium-4.11-green)
 ![Healenium](https://img.shields.io/badge/Healenium-3.5.1-purple)

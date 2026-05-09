@@ -16,13 +16,20 @@ public class BaseTest {
     protected static final String CONFIG_PROP = "config.properties";
     protected static final Logger LOGGER = LogManager.getLogger(BaseTest.class);
 
+    // Static flag to block @BeforeMethod when environment is fatally broken
+    private static boolean fatalEnvironmentError = false;
+    private static String fatalErrorMessage = null;
+
     @BeforeSuite(alwaysRun = true)
     public void setUpSuite() {
         config = GenericUtil.getPropertiesFile(CONFIG_PROP);
 
-        String execution = System.getProperty("execution", "local");
+        // Use the same property resolution as DriverFactory (system property → env var → config file → default)
+        String execution = System.getProperty("execution", config.getProperty("execution", "local"));
         boolean healEnabled = Boolean.parseBoolean(
                 System.getProperty("heal.enabled", config.getProperty("heal.enabled", "true")));
+
+        LOGGER.info("Healenium check: execution={}, heal.enabled={}", execution, healEnabled);
 
         if (!"browserstack".equalsIgnoreCase(execution) && healEnabled) {
             String healeniumHost = System.getProperty("healenium.host", "localhost");
@@ -33,18 +40,33 @@ public class BaseTest {
                 conn.setReadTimeout(2000);
                 conn.connect();
                 if (conn.getResponseCode() != 200) {
-                    throw new RuntimeException("Healenium backend not ready");
+                    throw new RuntimeException("Healenium backend returned HTTP " + conn.getResponseCode());
                 }
                 LOGGER.info("Healenium backend is reachable.");
+            } catch (RuntimeException e) {
+                // Re-throw RuntimeExceptions directly (they include our own messages)
+                fatalEnvironmentError = true;
+                fatalErrorMessage = e.getMessage();
+                throw e;
             } catch (Exception e) {
-                throw new RuntimeException("Healenium not reachable", e);
+                fatalEnvironmentError = true;
+                fatalErrorMessage = "Healenium is not reachable. Please start services: " +
+                        "docker-compose up -d postgres-db healenium selector-imitator";
+                throw new RuntimeException(fatalErrorMessage, e);
             }
+        } else if (!healEnabled) {
+            LOGGER.warn("Healenium readiness check SKIPPED because heal.enabled=false. " +
+                    "Tests will run without self-healing.");
         }
     }
 
     @Parameters({"browser"})
     @BeforeMethod(alwaysRun = true)
     public void setUp(@Optional("chrome") String browser, Method method) {
+        if (fatalEnvironmentError) {
+            throw new RuntimeException("Test execution blocked: " + fatalErrorMessage);
+        }
+
         WebDriver driver = DriverFactory.createDriver(method.getName(), browser);
         DriverManager.setDriver(driver);
         LOGGER.info("Setting up: {} | browser: {} | thread: {}",

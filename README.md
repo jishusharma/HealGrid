@@ -20,6 +20,7 @@ AI-driven failure classification, and historical test health tracking via Postgr
 ## Capabilities
 
 - **ThreadLocal DriverFactory** — parallel-safe driver lifecycle with 4-level config fallback (JVM flag → env var → properties file → default)
+- **Reusable framework core** — framework utilities separated from application test code and modularized with optional execution-specific dependencies
 - **Self-healing locators** — Healenium wraps the driver and recovers broken selectors automatically; healing history persisted in PostgreSQL
 - **Three execution targets** — local JVM, Dockerized Selenium Grid (Chrome + Firefox nodes), BrowserStack cloud (Android + iOS)
 - **LLM-based failure classification and selective rerun** — `AiFailureAnalyzer` classifies failures post-run via Groq API and reruns only transient failures in the same build, leaving genuine defects flagged

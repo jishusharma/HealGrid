@@ -67,7 +67,7 @@ public class DriverFactory {
         bstackOptions.setCapability("buildName", BUILD_NAME);
         bstackOptions.setCapability("sessionName", sessionName);
         bstackOptions.setCapability("projectName",
-                getConfigValue("project.name", "HealGrid-TestFramework"));
+                getConfigValue("project.name", "HealGrid"));
         bstackOptions.setCapability("realMobile", "true");
 
         MutableCapabilities browserCaps;
@@ -124,7 +124,7 @@ public class DriverFactory {
         bstackOptions.setCapability("buildName", BUILD_NAME);
         bstackOptions.setCapability("sessionName", sessionName);
         bstackOptions.setCapability("projectName",
-                getConfigValue("project.name", "HealGrid-TestFramework"));
+                getConfigValue("project.name", "HealGrid"));
 
         String effectiveBrowser = (browser != null && !browser.isEmpty())
                 ? browser

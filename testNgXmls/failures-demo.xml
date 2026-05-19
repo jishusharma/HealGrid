@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
-<suite name="IntentionalFailures" verbose="1">
+<suite name="Failure Demo" verbose="1">
     <listeners>
         <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
     </listeners>
-    <test name="Intentional Failure Types">
+    <test name="Intentional Failures">
         <classes>
             <class name="api.test.IntentionalFailureTest"/>
         </classes>

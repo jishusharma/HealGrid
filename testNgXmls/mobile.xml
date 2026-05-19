@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
-<suite name="Mobile Android Suite" parallel="tests" thread-count="1">
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Mobile Suite" verbose="1">
+    <parameter name="execution" value="browserstack"/>
     <listeners>
         <listener class-name="utils.listeners.TestListener"/>
         <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
     </listeners>
-    <test name="Mobile Android - SauceDemo Login">
+    <test name="Android Login">
         <parameter name="browser" value="mobile_android"/>
+        <parameter name="bs.device" value="Samsung Galaxy S23"/>
+        <parameter name="bs.os.version" value="13.0"/>
+        <classes>
+            <class name="tests.mobile.SauceDemoLoginTest"/>
+        </classes>
+    </test>
+    <test name="iOS Login">
+        <parameter name="browser" value="mobile_ios"/>
+        <parameter name="bs.device" value="iPhone 14"/>
+        <parameter name="bs.os.version" value="16"/>
         <classes>
             <class name="tests.mobile.SauceDemoLoginTest"/>
         </classes>

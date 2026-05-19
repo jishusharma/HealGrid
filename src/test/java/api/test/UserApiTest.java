@@ -5,6 +5,7 @@ import api.service.UserApi;
 import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
+import org.testng.ITestContext;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -19,8 +20,8 @@ public class UserApiTest extends BaseApiTest {
 
     @BeforeClass
     @Override
-    public void setup() {
-        super.setup();
+    public void setup(ITestContext context) {
+        super.setup(context);
         userApi = new UserApi(requestSpec);
     }
 

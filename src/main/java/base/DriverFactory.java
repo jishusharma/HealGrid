@@ -1,5 +1,6 @@
 package base;
 
+import config.ConfigResolver;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.MutableCapabilities;
@@ -10,15 +11,11 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
-import utils.GenericUtil;
 
 import java.net.URL;
 import java.time.Instant;
-import java.util.Properties;
 
 public class DriverFactory {
-
-    private static final Properties config = GenericUtil.getPropertiesFile("config.properties");
     private static final Logger LOGGER = LogManager.getLogger(DriverFactory.class);
 
     public static WebDriver createDriver() {
@@ -26,7 +23,7 @@ public class DriverFactory {
     }
 
     public static WebDriver createDriver(String sessionName) {
-        String browser = getConfigValue("browser", "chrome");
+        String browser = ConfigResolver.get("browser", "chrome");
         return createDriver(sessionName, browser);
     }
 
@@ -37,7 +34,7 @@ public class DriverFactory {
             return createMobileDriver(sessionName, browser);
         }
 
-        String execution = getConfigValue("execution", "local");
+        String execution = ConfigResolver.get("execution", "local");
 
         if ("browserstack".equalsIgnoreCase(execution)) {
             return createBrowserStackDriver(sessionName, browser);
@@ -46,13 +43,13 @@ public class DriverFactory {
         WebDriver driver = "grid".equalsIgnoreCase(execution)
                 ? createRemoteDriver(browser)
                 : createLocalDriver(browser);
-        boolean healEnabled = Boolean.parseBoolean(getConfigValue("heal.enabled", "true"));
+        boolean healEnabled = Boolean.parseBoolean(ConfigResolver.get("heal.enabled", "true"));
         return healEnabled ? HealeniumWebDriverFactory.wrapDriver(driver) : driver;
     }
 
     private static WebDriver createMobileDriver(String sessionName, String browser) {
-        String username = getConfigValue("BROWSERSTACK_USERNAME", null);
-        String accessKey = getConfigValue("BROWSERSTACK_ACCESS_KEY", null);
+        String username = System.getenv("BROWSERSTACK_USERNAME");
+        String accessKey = System.getenv("BROWSERSTACK_ACCESS_KEY");
 
         if (username == null || username.isEmpty()) {
             throw new RuntimeException("BROWSERSTACK_USERNAME is not set. Set env var or Jenkins credential.");
@@ -67,16 +64,16 @@ public class DriverFactory {
         bstackOptions.setCapability("buildName", BUILD_NAME);
         bstackOptions.setCapability("sessionName", sessionName);
         bstackOptions.setCapability("projectName",
-                getConfigValue("project.name", "HealGrid"));
+                ConfigResolver.get("project.name", "HealGrid"));
         bstackOptions.setCapability("realMobile", "true");
 
         MutableCapabilities browserCaps;
 
         if ("mobile_ios".equalsIgnoreCase(browser)) {
             bstackOptions.setCapability("deviceName",
-                    getConfigValue("bs.device", "iPhone 14"));
+                    ConfigResolver.get("bs.device", "iPhone 14"));
             bstackOptions.setCapability("osVersion",
-                    getConfigValue("bs.os.version", "16"));
+                    ConfigResolver.get("bs.os.version", "16"));
             browserCaps = new MutableCapabilities();
             browserCaps.setCapability("browserName", "Safari");
             LOGGER.info("Creating mobile iOS driver: device={}, osVersion={}",
@@ -85,9 +82,9 @@ public class DriverFactory {
         } else {
             // mobile_android (default)
             bstackOptions.setCapability("deviceName",
-                    getConfigValue("bs.device", "Samsung Galaxy S23"));
+                    ConfigResolver.get("bs.device", "Samsung Galaxy S23"));
             bstackOptions.setCapability("osVersion",
-                    getConfigValue("bs.os.version", "13.0"));
+                    ConfigResolver.get("bs.os.version", "13.0"));
             browserCaps = new ChromeOptions();
             LOGGER.info("Creating mobile Android driver: device={}, osVersion={}",
                     bstackOptions.getCapability("deviceName"),
@@ -108,8 +105,8 @@ public class DriverFactory {
     }
 
     private static WebDriver createBrowserStackDriver(String sessionName, String browser) {
-        String username = getConfigValue("BROWSERSTACK_USERNAME", null);
-        String accessKey = getConfigValue("BROWSERSTACK_ACCESS_KEY", null);
+        String username = System.getenv("BROWSERSTACK_USERNAME");
+        String accessKey = System.getenv("BROWSERSTACK_ACCESS_KEY");
 
         if (username == null || username.isEmpty()) {
             throw new RuntimeException("BROWSERSTACK_USERNAME is not set. Set env var or Jenkins credential.");
@@ -124,11 +121,11 @@ public class DriverFactory {
         bstackOptions.setCapability("buildName", BUILD_NAME);
         bstackOptions.setCapability("sessionName", sessionName);
         bstackOptions.setCapability("projectName",
-                getConfigValue("project.name", "HealGrid"));
+                ConfigResolver.get("project.name", "HealGrid"));
 
         String effectiveBrowser = (browser != null && !browser.isEmpty())
                 ? browser
-                : getConfigValue("browser", "chrome");
+                : ConfigResolver.get("browser", "chrome");
         MutableCapabilities browserCaps;
 
         switch (effectiveBrowser.toLowerCase()) {
@@ -154,17 +151,23 @@ public class DriverFactory {
 
     private static WebDriver createRemoteDriver(String browser) {
         try {
-            String gridUrl = System.getProperty("grid.url",
-                    config.getProperty("grid.url", "http://localhost:4444"));
+            String gridUrl = ConfigResolver.get("grid.url", "http://localhost:4444");
             URL url = new URL(gridUrl);
+            RemoteWebDriver remoteDriver;
             switch (browser.toLowerCase()) {
                 case "chrome":
-                    return new RemoteWebDriver(url, getChromeOptions());
+                    remoteDriver = new RemoteWebDriver(url, getChromeOptions());
+                    break;
                 case "firefox":
-                    return new RemoteWebDriver(url, new FirefoxOptions());
+                    remoteDriver = new RemoteWebDriver(url, new FirefoxOptions());
+                    break;
                 default:
                     throw new RuntimeException("Unsupported browser: " + browser);
             }
+            LOGGER.info("Grid session assigned: {} | browser: {} | thread: {}",
+                    remoteDriver.getSessionId(), browser,
+                    Thread.currentThread().getId());
+            return remoteDriver;
         } catch (Exception e) {
             throw new RuntimeException("Failed to create RemoteWebDriver", e);
         }
@@ -187,7 +190,7 @@ public class DriverFactory {
 
     private static ChromeOptions getChromeOptions() {
         ChromeOptions options = new ChromeOptions();
-        boolean isHeadless = Boolean.parseBoolean(getConfigValue("headless", "false"));
+        boolean isHeadless = Boolean.parseBoolean(ConfigResolver.get("headless", "false"));
         if (isHeadless) {
             options.addArguments("--headless");
             options.addArguments("--window-size=1920,1080");
@@ -197,17 +200,7 @@ public class DriverFactory {
         return options;
     }
 
-    private static String getConfigValue(String key, String defaultValue) {
-        String value = System.getProperty(key);
-        if (value != null) return value;
-        value = System.getenv(key);
-        if (value != null) return value;
-        value = config.getProperty(key);
-        if (value != null) return value;
-        return defaultValue;
-    }
-
-    private static final String BUILD_NAME = getConfigValue(
+    private static final String BUILD_NAME = ConfigResolver.get(
             "build.name",
             "HealGrid-Build-" + Instant.now().toEpochMilli()
     );

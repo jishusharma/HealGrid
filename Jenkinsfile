@@ -57,7 +57,7 @@ pipeline {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     echo 'Running REST Assured API tests...'
                     withCredentials([string(credentialsId: 'REQRES_API_KEY', variable: 'REQRES_API_KEY')]) {
-                        sh 'mvn test -Dsurefire.suiteXmlFiles=testNgXmls/api.xml -Dsuite.name=api'
+                        sh 'mvn test -Dsurefire.suiteXmlFiles=testNgXmls/api-suite.xml -Dsuite.name=api'
                     }
                     sh 'cp target/surefire-reports/TEST-TestSuite.xml target/surefire-reports/TEST-API-TestSuite.xml'
                 }
@@ -72,9 +72,8 @@ pipeline {
                     script {
                         withCredentials([string(credentialsId: 'BROWSERSTACK_USERNAME', variable: 'BROWSERSTACK_USERNAME'),
                                          string(credentialsId: 'BROWSERSTACK_ACCESS_KEY', variable: 'BROWSERSTACK_ACCESS_KEY')]) {
-                            echo 'Running mobile Android tests on BrowserStack...'
-                            sh "mvn test -Dsurefire.suiteXmlFiles=testNgXmls/mobile.xml -Dexecution=browserstack -Dbs.device=\"Samsung Galaxy S23\" -Dbs.os.version=13.0 -Dbuild.name=\"HealGrid-Mobile-${env.BUILD_NUMBER}\" -Dsuite.name=mobile -Dbrowser.name=android"
-                            sh "mvn test -Dsurefire.suiteXmlFiles=testNgXmls/mobile_ios.xml -Dexecution=browserstack -Dbs.device=\"iPhone 14\" -Dbs.os.version=16 -Dbuild.name=\"HealGrid-Mobile-${env.BUILD_NUMBER}\" -Dsuite.name=mobile -Dbrowser.name=ios"
+                            echo 'Running mobile Android and iOS tests on BrowserStack...'
+                            sh "mvn test -Dsurefire.suiteXmlFiles=testNgXmls/mobile.xml -Dbuild.name=\"HealGrid-Mobile-${env.BUILD_NUMBER}\" -Dsuite.name=mobile"
                         }
                     }
                 }

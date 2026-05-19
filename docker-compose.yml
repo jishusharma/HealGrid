@@ -94,7 +94,7 @@
       - healenium
     command: >
       bash -c "mkdir -p /app/target/surefire-reports/junitreports &&
-      mvn test -Dheadless=true -Dhealenium.host=healenium -Dexecution=grid -Dgrid.url=http://selenium-hub:4444 -Dsurefire.suiteXmlFiles=testNgXmls/docker.xml -Dsuite.name=grid -Dbrowser.name=chrome"
+      mvn test -Dheadless=true -Dhealenium.host=healenium -Dexecution=grid -Dgrid.url=http://selenium-hub:4444 -Dsurefire.suiteXmlFiles=testNgXmls/ui-grid-parallel-classes.xml -Dsuite.name=grid -Dbrowser.name=chrome"
 
   selenium-hub:
     image: selenium/hub:4.21.0
@@ -120,6 +120,9 @@
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_EVENT_BUS_PUBLISH_PORT=4442
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_NODE_MAX_SESSIONS=4
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    mem_limit: 4g
     networks:
       - healenium
 
@@ -133,6 +136,9 @@
       - SE_EVENT_BUS_HOST=selenium-hub
       - SE_EVENT_BUS_PUBLISH_PORT=4442
       - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_NODE_MAX_SESSIONS=2
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    mem_limit: 3g
     networks:
       - healenium
 

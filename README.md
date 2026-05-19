@@ -55,13 +55,13 @@ AI-driven failure classification, and historical test health tracking via Postgr
 
 ```bash
 # API tests
-mvn test -Dsurefire.suiteXmlFiles=testNgXmls/api.xml
+mvn test -Dsurefire.suiteXmlFiles=testNgXmls/api-suite.xml
 
 # UI tests — parallel by class (local)
-mvn test -Dsurefire.suiteXmlFiles=testNgXmls/parallelClasses.xml
+mvn test -Dsurefire.suiteXmlFiles=testNgXmls/ui-grid-parallel-classes.xml
 
 # UI tests — cross-browser parallel
-mvn test -Dsurefire.suiteXmlFiles=testNgXmls/multiBrowserClasses.xml
+mvn test -Dsurefire.suiteXmlFiles=testNgXmls/ui-local-crossbrowser.xml
 
 # Grid + Healenium (full Docker)
 docker-compose up --build --abort-on-container-exit test-runner

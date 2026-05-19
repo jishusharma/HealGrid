@@ -7,6 +7,7 @@ import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.specification.RequestSpecification;
+import org.testng.ITestContext;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -20,8 +21,8 @@ public class AuthApiTest extends BaseApiTest {
 
     @BeforeClass
     @Override
-    public void setup() {
-        super.setup();
+    public void setup(ITestContext context) {
+        super.setup(context);
         RequestSpecification authSpec = new RequestSpecBuilder()
                 .addRequestSpecification(requestSpec)
                 .addHeader("x-api-key", System.getenv("REQRES_API_KEY"))

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Local Heavy Suite" verbose="1" parallel="tests" thread-count="3">
+    <listeners>
+        <listener class-name="utils.listeners.TestListener"/>
+        <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
+    </listeners>
+
+    <!-- API tests (no browser) -->
+    <test name="API Tests" parallel="classes" thread-count="2">
+        <classes>
+            <class name="api.test.UserApiTest"/>
+            <class name="api.test.AuthApiTest"/>
+        </classes>
+    </test>
+
+    <!-- Chrome UI tests – 3 headed Chrome windows -->
+    <test name="Chrome UI Tests" parallel="classes" thread-count="3">
+        <parameter name="browser" value="chrome"/>
+        <packages>
+            <package name="tests.*"/>
+        </packages>
+    </test>
+
+    <!-- Firefox UI tests – 2 headed Firefox windows -->
+    <test name="Firefox UI Tests" parallel="classes" thread-count="2">
+        <parameter name="browser" value="firefox"/>
+        <packages>
+            <package name="tests.*"/>
+        </packages>
+    </test>
+</suite>

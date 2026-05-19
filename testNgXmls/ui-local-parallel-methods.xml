@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Local UI Parallel Methods" verbose="1" parallel="methods" thread-count="5">
+    <listeners>
+        <listener class-name="utils.listeners.TestListener"/>
+        <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
+    </listeners>
+    <test name="Chrome Tests (parallel methods)">
+        <parameter name="browser" value="chrome"/>
+        <packages>
+            <package name="tests.*"/>
+        </packages>
+    </test>
+</suite>

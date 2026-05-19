@@ -1,18 +1,17 @@
 package base;
 
+import config.ConfigResolver;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.WebDriver;
+import org.testng.ITestContext;
 import org.testng.annotations.*;
-import utils.GenericUtil;
 
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Properties;
 import java.lang.reflect.Method;
 
 public class BaseTest {
-    protected static Properties config;
     protected static final String CONFIG_PROP = "config.properties";
     protected static final Logger LOGGER = LogManager.getLogger(BaseTest.class);
 
@@ -21,18 +20,26 @@ public class BaseTest {
     private static String fatalErrorMessage = null;
 
     @BeforeSuite(alwaysRun = true)
-    public void setUpSuite() {
-        config = GenericUtil.getPropertiesFile(CONFIG_PROP);
+    public void setUpSuite(ITestContext context) {
+        // Feed suite parameters to the shared ConfigResolver
+        ConfigResolver.setSuiteParameters(context.getSuite().getXmlSuite().getParameters());
 
-        // Use the same property resolution as DriverFactory (system property → env var → config file → default)
-        String execution = System.getProperty("execution", config.getProperty("execution", "local"));
-        boolean healEnabled = Boolean.parseBoolean(
-                System.getProperty("heal.enabled", config.getProperty("heal.enabled", "true")));
+        // Log suite identity and invocation command
+        LOGGER.info("TestNG suite: {}", context.getSuite().getName());
+        String cmd = System.getProperty("sun.java.command", "IDE or unknown");
+        LOGGER.info("Command: {}", cmd);
+
+        // Resolve execution mode and heal flag through the shared chain
+        String execution = ConfigResolver.get("execution", "local");
+        boolean healEnabled = ConfigResolver.getBoolean("heal.enabled", true);
+        ConfigResolver.logResolved("execution", "local");
+        ConfigResolver.logResolved("heal.enabled", "true");
+        ConfigResolver.logResolved("grid.url", "http://localhost:4444");
 
         LOGGER.info("Healenium check: execution={}, heal.enabled={}", execution, healEnabled);
 
         if (!"browserstack".equalsIgnoreCase(execution) && healEnabled) {
-            String healeniumHost = System.getProperty("healenium.host", "localhost");
+            String healeniumHost = ConfigResolver.get("healenium.host", "localhost");
             try {
                 URL url = new URL("http://" + healeniumHost + ":7878/healenium/report");
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -44,7 +51,6 @@ public class BaseTest {
                 }
                 LOGGER.info("Healenium backend is reachable.");
             } catch (RuntimeException e) {
-                // Re-throw RuntimeExceptions directly (they include our own messages)
                 fatalEnvironmentError = true;
                 fatalErrorMessage = e.getMessage();
                 throw e;
@@ -62,16 +68,17 @@ public class BaseTest {
 
     @Parameters({"browser"})
     @BeforeMethod(alwaysRun = true)
-    public void setUp(@Optional("chrome") String browser, Method method) {
+    public void setUp(@Optional("chrome") String browser, Method method, ITestContext context) {
         if (fatalEnvironmentError) {
             throw new RuntimeException("Test execution blocked: " + fatalErrorMessage);
         }
 
+        ConfigResolver.setTestParameters(context.getCurrentXmlTest().getAllParameters());
         WebDriver driver = DriverFactory.createDriver(method.getName(), browser);
         DriverManager.setDriver(driver);
         LOGGER.info("Setting up: {} | browser: {} | thread: {}",
                 method.getName(), browser, Thread.currentThread().getId());
-        boolean isHeadless = Boolean.parseBoolean(System.getProperty("headless", "false"));
+        boolean isHeadless = ConfigResolver.getBoolean("headless", false);
         boolean isMobile = browser != null && (browser.equalsIgnoreCase("mobile_android")
                 || browser.equalsIgnoreCase("mobile_ios"));
         if (!isHeadless && !isMobile) {
@@ -85,5 +92,6 @@ public class BaseTest {
                 method.getName(), Thread.currentThread().getId());
         DriverManager.quitDriver();
         BrowserStackSessionContext.clear();
+        ConfigResolver.clearTestParameters();
     }
 }

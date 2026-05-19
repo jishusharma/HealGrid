@@ -1,27 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
-<suite name="Multi Browser Suite" parallel="tests" thread-count="6">
+<suite name="Grid Full Suite" verbose="1" parallel="tests" thread-count="3">
+    <parameter name="execution" value="grid"/>
+    <parameter name="grid.url" value="http://localhost:4444"/>
+
     <listeners>
         <listener class-name="utils.listeners.TestListener"/>
         <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
     </listeners>
 
-    <test name="Chrome Tests" parallel="methods" thread-count="3">
+    <!-- API Tests (no browser) -->
+    <test name="API Tests" parallel="classes" thread-count="2">
+        <classes>
+            <class name="api.test.UserApiTest"/>
+            <class name="api.test.AuthApiTest"/>
+        </classes>
+    </test>
+
+    <!-- Chrome UI Tests -->
+    <test name="Chrome UI Tests" parallel="classes" thread-count="2">
         <parameter name="browser" value="chrome"/>
         <classes>
             <class name="tests.DemoQAMainPageTest"/>
             <class name="tests.DemoQAElementsPageTest"/>
-            <class name="tests.AiCompareImagesTest"/>
         </classes>
     </test>
 
-    <test name="Firefox Tests" parallel="methods" thread-count="3">
+    <!-- Firefox UI Tests -->
+    <test name="Firefox UI Tests" parallel="classes" thread-count="2">
         <parameter name="browser" value="firefox"/>
         <classes>
             <class name="tests.DemoQAMainPageTest"/>
             <class name="tests.DemoQAElementsPageTest"/>
-            <class name="tests.AiCompareImagesTest"/>
         </classes>
     </test>
-
 </suite>

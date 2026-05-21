@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Healenium Healing Proof" verbose="1" preserve-order="true">
+    <parameter name="execution" value="grid"/>
+    <parameter name="grid.url" value="http://localhost:4444"/>
+    <listeners>
+        <listener class-name="utils.listeners.TestListener"/>
+        <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
+    </listeners>
+    <test name="Chrome Healing Proof">
+        <parameter name="browser" value="chrome"/>
+        <classes>
+            <class name="tests.HealeniumHealingProofTest"/>
+        </classes>
+    </test>
+</suite>

@@ -11,6 +11,9 @@ logs/
 *.ini
 /docker-run-filtered.ps1
 /dump-project.ps1
+/scripts/dump-project.ps1
+/db-backups/
+/docs/healenium-session-output/
 
 allure-results/
 allure-report/

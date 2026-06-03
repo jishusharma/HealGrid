@@ -90,11 +90,16 @@
       - DB_NAME=healenium
       - DB_USER=healenium_user
       - DB_PASSWORD=healenium_password
+      - TEST_SUITE_XMLS
+      - SUITE_NAME
+      - BROWSER_NAME
     networks:
       - healenium
     command: >
       bash -c "mkdir -p /app/target/surefire-reports/junitreports &&
-      mvn test -Dheadless=true -Dhealenium.host=healenium -Dexecution=grid -Dgrid.url=http://selenium-hub:4444 -Dsurefire.suiteXmlFiles=testNgXmls/ui-grid-parallel-classes.xml -Dsuite.name=grid -Dbrowser.name=chrome"
+      BROWSER_ARG='' &&
+      if [ -n \"$$BROWSER_NAME\" ]; then BROWSER_ARG=\"-Dbrowser.name=$$BROWSER_NAME\"; fi &&
+      mvn test -Dheadless=true -Dhealenium.host=healenium -Dexecution=grid -Dgrid.url=http://selenium-hub:4444 -Dsurefire.suiteXmlFiles=$${TEST_SUITE_XMLS:-testNgXmls/ui-grid-parallel-classes.xml} -Dsuite.name=$${SUITE_NAME:-grid} $$BROWSER_ARG"
 
   selenium-hub:
     image: selenium/hub:4.21.0

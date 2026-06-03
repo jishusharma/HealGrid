@@ -17,6 +17,11 @@ pipeline {
         githubPush()
     }
     parameters {
+        choice(
+            name: 'TEST_PROFILE',
+            choices: ['ci-default', 'api', 'grid-ui', 'mobile', 'healing-proof', 'reporting-validation', 'full-regression'],
+            description: 'Select the test profile for manual Jenkins runs. Webhook builds use ci-default.'
+        )
         booleanParam(name: 'RUN_MOBILE', defaultValue: false, description: 'Run mobile tests on BrowserStack')
     }
     stages {
@@ -53,6 +58,9 @@ pipeline {
             }
         }
         stage('API Tests') {
+            when {
+                expression { ['ci-default', 'api'].contains(params.TEST_PROFILE ?: 'ci-default') }
+            }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     echo 'Running REST Assured API tests...'
@@ -65,7 +73,7 @@ pipeline {
         }
         stage('Mobile Tests') {
             when {
-                expression { params.RUN_MOBILE }
+                expression { params.RUN_MOBILE || ['mobile', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
             }
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
@@ -80,21 +88,62 @@ pipeline {
             }
         }
         stage('Test') {
+            when {
+                expression { ['ci-default', 'grid-ui', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
+            }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    echo 'Starting Grid + Healenium + Running tests...'
-                    sh 'mkdir -p target/surefire-reports/junitreports'
-                    sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit healenium selector-imitator selenium-hub chrome firefox test-runner'
-                    sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
-                    // sh 'ls -la target/surefire-reports/'
-                    sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
-                    // sh 'ls -la target/allure-results/'
+                    script {
+                        def profile = params.TEST_PROFILE ?: 'ci-default'
+                        def suiteXml = profile == 'full-regression' ? 'testNgXmls/grid-full-suite.xml' : 'testNgXmls/ui-grid-parallel-classes.xml'
+                        def suiteName = profile == 'full-regression' ? 'full-regression-grid' : 'grid'
+                        echo "Starting Grid + Healenium tests for ${profile}: ${suiteXml}"
+                        withEnv(["TEST_SUITE_XMLS=${suiteXml}", "SUITE_NAME=${suiteName}", "BROWSER_NAME="]) {
+                            sh 'mkdir -p target/surefire-reports/junitreports'
+                            sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit healenium selector-imitator selenium-hub chrome firefox test-runner'
+                            sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
+                            sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
+                        }
+                    }
                 }
             }
             post {
                 always {
                     sh 'docker-compose -f $COMPOSE_FILE stop test-runner chrome firefox selenium-hub healenium selector-imitator || true'
                     sh 'docker-compose -f $COMPOSE_FILE rm -f test-runner chrome firefox selenium-hub healenium selector-imitator || true'
+                }
+            }
+        }
+        stage('Healing Proof') {
+            when {
+                expression { ['healing-proof', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
+            }
+            steps {
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                    echo 'Running focused Healenium healing proof...'
+                    withEnv(["TEST_SUITE_XMLS=testNgXmls/healenium-healing-proof.xml", "SUITE_NAME=healing-proof", "BROWSER_NAME="]) {
+                        sh 'mkdir -p target/surefire-reports/junitreports'
+                        sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit healenium selector-imitator selenium-hub chrome firefox test-runner'
+                        sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
+                        sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
+                    }
+                }
+            }
+            post {
+                always {
+                    sh 'docker-compose -f $COMPOSE_FILE stop test-runner chrome firefox selenium-hub healenium selector-imitator || true'
+                    sh 'docker-compose -f $COMPOSE_FILE rm -f test-runner chrome firefox selenium-hub healenium selector-imitator || true'
+                }
+            }
+        }
+        stage('Reporting Validation') {
+            when {
+                expression { (params.TEST_PROFILE ?: 'ci-default') == 'reporting-validation' }
+            }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    echo 'Running intentional failure suite for report validation...'
+                    sh 'mvn test -Dsurefire.suiteXmlFiles=testNgXmls/failures-demo.xml -Dsuite.name=reporting-validation'
                 }
             }
         }

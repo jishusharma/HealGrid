@@ -39,22 +39,23 @@ public class ConfigResolver {
         String value = System.getProperty(key);
         if (value != null) return value;
 
-        // 2. TestNG XML suite parameter – suite author's intent
+        // 2. TestNG XML test parameter
         value = testParams.get().get(key);
         if (value != null) return value;
 
+        // 3. TestNG XML suite parameter – suite author's intent
         value = suiteParams.get(key);
         if (value != null) return value;
 
-        // 3. Environment variable – infrastructure / secrets
+        // 4. Environment variable – infrastructure / secrets
         value = System.getenv(key);
         if (value != null) return value;
 
-        // 4. config.properties – baseline
+        // 5. config.properties – baseline
         value = configFile.getProperty(key);
         if (value != null) return value;
 
-        // 5. Hardcoded default
+        // 6. Hardcoded default
         return defaultValue;
     }
 

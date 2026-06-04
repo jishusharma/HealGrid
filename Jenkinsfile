@@ -37,6 +37,17 @@ pipeline {
                 sh 'mvn clean compile -q'
             }
         }
+        stage('Prepare Test Output') {
+            steps {
+                echo 'Cleaning stale test output...'
+                sh '''
+                    rm -rf target/allure-results target/allure-report target/surefire-reports
+                    rm -f target/ai-failure-report.json target/allure-history.tar.gz
+                    rm -f target/observability/flaky-report.html target/observability/trend-report.html
+                    mkdir -p target/allure-results target/surefire-reports/junitreports target/observability
+                '''
+            }
+        }
         stage('Start DB') {
             steps {
                 echo 'Starting PostgreSQL database...'
@@ -98,10 +109,8 @@ pipeline {
                         def suiteXml = profile == 'full-regression' ? 'testNgXmls/grid-full-suite.xml' : 'testNgXmls/ui-grid-parallel-classes.xml'
                         def suiteName = profile == 'full-regression' ? 'full-regression-grid' : 'grid'
                         echo "Starting Grid + Healenium tests for ${profile}: ${suiteXml}"
-                        // CHANGE 2: removed BROWSER_NAME="" — docker-compose.yml handles the default
                         withEnv(["TEST_SUITE_XMLS=${suiteXml}", "SUITE_NAME=${suiteName}"]) {
                             sh 'mkdir -p target/surefire-reports/junitreports'
-                            // CHANGE 1: added --exit-code-from test-runner for reliable exit code
                             sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit --exit-code-from test-runner healenium selector-imitator selenium-hub chrome firefox test-runner'
                             sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
                             sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
@@ -123,10 +132,8 @@ pipeline {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     echo 'Running focused Healenium healing proof...'
-                    // CHANGE 2: removed BROWSER_NAME="" — docker-compose.yml handles the default
                     withEnv(["TEST_SUITE_XMLS=testNgXmls/healenium-healing-proof.xml", "SUITE_NAME=healing-proof"]) {
                         sh 'mkdir -p target/surefire-reports/junitreports'
-                        // CHANGE 1: added --exit-code-from test-runner for reliable exit code
                         sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit --exit-code-from test-runner healenium selector-imitator selenium-hub chrome firefox test-runner'
                         sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
                         sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
@@ -162,7 +169,7 @@ pipeline {
                         archiveArtifacts artifacts: 'target/ai-failure-report.json', allowEmptyArchive: true
                         echo 'AI failure report archived.'
                     } else {
-                        echo 'No failures detected — report not generated.'
+                        echo 'No failures detected - report not generated.'
                     }
                 }
             }
@@ -172,7 +179,6 @@ pipeline {
                 script {
                     if (fileExists('target/ai-failure-report.json')) {
                         def rerunTests = parseRerunTests(readFile('target/ai-failure-report.json'))
-                        // CHANGE 3: gate rerun to profiles where plain Maven rerun is valid
                         def profile = params.TEST_PROFILE ?: 'ci-default'
                         def localRerunProfiles = ['api', 'reporting-validation']
                         if (rerunTests) {
@@ -182,7 +188,7 @@ pipeline {
                                     sh "mvn test -Dtest=${rerunTests} -DfailIfNoTests=false"
                                 }
                             } else {
-                                echo "Skipping rerun for profile '${profile}' — Grid/Healenium stack no longer running."
+                                echo "Skipping rerun for profile '${profile}' - Grid/Healenium stack no longer running."
                             }
                         } else {
                             echo 'No tests marked RERUN. Skipping.'
@@ -225,8 +231,17 @@ pipeline {
                 script {
                     def prevBuild = currentBuild.previousSuccessfulBuild
                     if (prevBuild != null) {
-                        def prevHist = "${JENKINS_HOME}/jobs/${env.JOB_NAME}/builds/${prevBuild.number}/archive/target/allure-report/history"
-                        sh "cp -r ${prevHist} ${WORKSPACE}/target/allure-results/history 2>/dev/null || true"
+                        def prevArchive = "${JENKINS_HOME}/jobs/${env.JOB_NAME}/builds/${prevBuild.number}/archive"
+                        def prevHistoryArchive = "${prevArchive}/target/allure-history.tar.gz"
+                        def prevHist = "${prevArchive}/target/allure-report/history"
+                        sh """
+                            mkdir -p "${WORKSPACE}/target/allure-results"
+                            if [ -f "${prevHistoryArchive}" ]; then
+                                tar -xzf "${prevHistoryArchive}" -C "${WORKSPACE}/target/allure-results"
+                            elif [ -d "${prevHist}" ]; then
+                                cp -r "${prevHist}" "${WORKSPACE}/target/allure-results/history"
+                            fi
+                        """
                     }
                 }
                 sh 'allure generate target/allure-results --clean -o target/allure-report'
@@ -260,7 +275,14 @@ pipeline {
     post {
         always {
             echo 'Archiving Allure history for next build...'
-            archiveArtifacts artifacts: 'target/allure-report/history/**', allowEmptyArchive: true
+            sh '''
+                if [ -d target/allure-report/history ]; then
+                    tar -czf target/allure-history.tar.gz -C target/allure-report history
+                else
+                    rm -f target/allure-history.tar.gz
+                fi
+            '''
+            archiveArtifacts artifacts: 'target/allure-history.tar.gz', allowEmptyArchive: true
             echo 'Cleaning up containers...'
             sh 'docker-compose -f $COMPOSE_FILE stop healenium selector-imitator selenium-hub chrome firefox test-runner || true'
             sh 'docker-compose -f $COMPOSE_FILE rm -f healenium selector-imitator selenium-hub chrome firefox test-runner || true'

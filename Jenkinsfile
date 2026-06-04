@@ -168,12 +168,12 @@ pipeline {
                 script {
                     if (fileExists('target/ai-failure-report.json')) {
                         def report = readFile('target/ai-failure-report.json')
-                        def rerunTests = parseRerunTests(report)
+                        def rerunTests = parseRerunTests(report).split(',').findAll { it?.startsWith('api.') }.join(',')
                         if (rerunTests) {
-                            echo "Rerunning RERUN-tagged tests: ${rerunTests}"
+                            echo "Rerunning API RERUN-tagged tests: ${rerunTests}"
                             sh "mvn test -Dtest=${rerunTests} -DfailIfNoTests=false"
                         } else {
-                            echo 'No tests marked RERUN. Skipping.'
+                            echo 'No API tests marked RERUN. UI reruns require the Grid/Healenium Docker stage and are not rerun locally.'
                         }
                     } else {
                         echo 'No AI report found. Skipping rerun.'

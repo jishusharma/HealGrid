@@ -45,6 +45,7 @@ pipeline {
                     rm -f target/ai-failure-report.json target/allure-history.tar.gz
                     rm -f target/observability/flaky-report.html target/observability/trend-report.html
                     mkdir -p target/allure-results target/surefire-reports/junitreports target/observability
+                    touch target/.test-output-start
                 '''
             }
         }
@@ -156,6 +157,18 @@ pipeline {
                     echo 'Running intentional failure suite for report validation...'
                     sh 'mvn test -Dsurefire.suiteXmlFiles=testNgXmls/failures-demo.xml -Dsuite.name=reporting-validation'
                 }
+            }
+        }
+        stage('Sanitize Test Output') {
+            steps {
+                echo 'Removing stale test output reintroduced by mounted Docker paths...'
+                sh '''
+                    if [ -f target/.test-output-start ]; then
+                        find target/allure-results -mindepth 1 -maxdepth 1 ! -newer target/.test-output-start -exec rm -rf {} +
+                        find target/surefire-reports -mindepth 1 ! -newer target/.test-output-start -exec rm -rf {} +
+                        mkdir -p target/surefire-reports/junitreports
+                    fi
+                '''
             }
         }
         stage('AI Failure Analysis') {

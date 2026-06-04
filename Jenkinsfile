@@ -98,9 +98,11 @@ pipeline {
                         def suiteXml = profile == 'full-regression' ? 'testNgXmls/grid-full-suite.xml' : 'testNgXmls/ui-grid-parallel-classes.xml'
                         def suiteName = profile == 'full-regression' ? 'full-regression-grid' : 'grid'
                         echo "Starting Grid + Healenium tests for ${profile}: ${suiteXml}"
-                        withEnv(["TEST_SUITE_XMLS=${suiteXml}", "SUITE_NAME=${suiteName}", "BROWSER_NAME="]) {
+                        // CHANGE 2: removed BROWSER_NAME="" — docker-compose.yml handles the default
+                        withEnv(["TEST_SUITE_XMLS=${suiteXml}", "SUITE_NAME=${suiteName}"]) {
                             sh 'mkdir -p target/surefire-reports/junitreports'
-                            sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit healenium selector-imitator selenium-hub chrome firefox test-runner'
+                            // CHANGE 1: added --exit-code-from test-runner for reliable exit code
+                            sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit --exit-code-from test-runner healenium selector-imitator selenium-hub chrome firefox test-runner'
                             sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
                             sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
                         }
@@ -121,9 +123,11 @@ pipeline {
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     echo 'Running focused Healenium healing proof...'
-                    withEnv(["TEST_SUITE_XMLS=testNgXmls/healenium-healing-proof.xml", "SUITE_NAME=healing-proof", "BROWSER_NAME="]) {
+                    // CHANGE 2: removed BROWSER_NAME="" — docker-compose.yml handles the default
+                    withEnv(["TEST_SUITE_XMLS=testNgXmls/healenium-healing-proof.xml", "SUITE_NAME=healing-proof"]) {
                         sh 'mkdir -p target/surefire-reports/junitreports'
-                        sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit healenium selector-imitator selenium-hub chrome firefox test-runner'
+                        // CHANGE 1: added --exit-code-from test-runner for reliable exit code
+                        sh 'docker-compose -f $COMPOSE_FILE up --build --abort-on-container-exit --exit-code-from test-runner healenium selector-imitator selenium-hub chrome firefox test-runner'
                         sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/surefire-reports/. target/surefire-reports/'
                         sh 'docker cp $(docker-compose -f $COMPOSE_FILE ps -q --all test-runner):/app/target/allure-results/. target/allure-results/'
                     }
@@ -167,11 +171,19 @@ pipeline {
             steps {
                 script {
                     if (fileExists('target/ai-failure-report.json')) {
-                        def report = readFile('target/ai-failure-report.json')
-                        def rerunTests = parseRerunTests(report)
+                        def rerunTests = parseRerunTests(readFile('target/ai-failure-report.json'))
+                        // CHANGE 3: gate rerun to profiles where plain Maven rerun is valid
+                        def profile = params.TEST_PROFILE ?: 'ci-default'
+                        def localRerunProfiles = ['api', 'reporting-validation']
                         if (rerunTests) {
-                            echo "Rerunning RERUN-tagged tests: ${rerunTests}"
-                            sh "mvn test -Dtest=${rerunTests} -DfailIfNoTests=false"
+                            if (localRerunProfiles.contains(profile)) {
+                                echo "Rerunning RERUN-tagged tests: ${rerunTests}"
+                                withCredentials([string(credentialsId: 'REQRES_API_KEY', variable: 'REQRES_API_KEY')]) {
+                                    sh "mvn test -Dtest=${rerunTests} -DfailIfNoTests=false"
+                                }
+                            } else {
+                                echo "Skipping rerun for profile '${profile}' — Grid/Healenium stack no longer running."
+                            }
                         } else {
                             echo 'No tests marked RERUN. Skipping.'
                         }
@@ -200,7 +212,7 @@ pipeline {
         }
         stage('Trend Report') {
             steps {
-                echo 'Generating build‑based trend report...'
+                echo 'Generating build-based trend report...'
                 withEnv(["DB_HOST=host.docker.internal", "DB_PORT=5432", "DB_NAME=healenium", "DB_USER=healenium_user", "DB_PASSWORD=healenium_password"]) {
                     sh 'mvn exec:java -Dexec.mainClass=observability.TrendReporter -Dexec.classpathScope=runtime'
                 }

@@ -12,7 +12,6 @@ pipeline {
     agent any
     environment {
         COMPOSE_FILE = 'docker-compose.yml'
-        API_GATE_PASSED = 'false'
     }
     triggers {
         githubPush()
@@ -45,6 +44,7 @@ pipeline {
                     rm -rf target/allure-results target/allure-report target/surefire-reports
                     rm -f target/ai-failure-report.json target/allure-history.tar.gz
                     rm -f target/observability/flaky-report.html target/observability/trend-report.html
+                    rm -f target/.api-gate-passed
                     mkdir -p target/allure-results target/surefire-reports/junitreports target/observability
                     touch target/.test-output-start
                 '''
@@ -81,9 +81,7 @@ pipeline {
                         sh 'mvn test -Dsurefire.suiteXmlFiles=testNgXmls/api-suite.xml -Dsuite.name=api'
                     }
                     sh 'cp target/surefire-reports/TEST-TestSuite.xml target/surefire-reports/TEST-API-TestSuite.xml'
-                    script {
-                        env.API_GATE_PASSED = 'true'
-                    }
+                    sh 'touch target/.api-gate-passed'
                 }
             }
         }
@@ -94,7 +92,7 @@ pipeline {
                     if (profile == 'grid-ui') {
                         return true
                     }
-                    return ['ci-default', 'full-regression'].contains(profile) && env.API_GATE_PASSED == 'true'
+                    return ['ci-default', 'full-regression'].contains(profile) && fileExists('target/.api-gate-passed')
                 }
             }
             steps {
@@ -126,7 +124,7 @@ pipeline {
                     def profile = params.TEST_PROFILE ?: 'ci-default'
                     def requested = params.RUN_MOBILE || ['mobile', 'full-regression'].contains(profile)
                     def apiGateRequired = ['ci-default', 'api', 'full-regression'].contains(profile)
-                    return requested && (!apiGateRequired || env.API_GATE_PASSED == 'true')
+                    return requested && (!apiGateRequired || fileExists('target/.api-gate-passed'))
                 }
             }
             steps {
@@ -145,7 +143,7 @@ pipeline {
             when {
                 expression {
                     def profile = params.TEST_PROFILE ?: 'ci-default'
-                    return profile == 'healing-proof' || (profile == 'full-regression' && env.API_GATE_PASSED == 'true')
+                    return profile == 'healing-proof' || (profile == 'full-regression' && fileExists('target/.api-gate-passed'))
                 }
             }
             steps {

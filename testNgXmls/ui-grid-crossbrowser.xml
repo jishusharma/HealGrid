@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="Grid UI Cross Browser" verbose="1" parallel="tests" thread-count="3">
+    <parameter name="execution" value="grid"/>
+    <parameter name="grid.url" value="http://localhost:4444"/>
+
+    <listeners>
+        <listener class-name="utils.listeners.TestListener"/>
+        <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
+    </listeners>
+
+    <test name="Chrome UI Tests" parallel="classes" thread-count="2">
+        <parameter name="browser" value="chrome"/>
+        <classes>
+            <class name="tests.DemoQAMainPageTest"/>
+            <class name="tests.DemoQAElementsPageTest"/>
+        </classes>
+    </test>
+
+    <test name="Firefox UI Tests" parallel="classes" thread-count="2">
+        <parameter name="browser" value="firefox"/>
+        <classes>
+            <class name="tests.DemoQAMainPageTest"/>
+            <class name="tests.DemoQAElementsPageTest"/>
+        </classes>
+    </test>
+</suite>

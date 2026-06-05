@@ -12,6 +12,7 @@ pipeline {
     agent any
     environment {
         COMPOSE_FILE = 'docker-compose.yml'
+        API_GATE_PASSED = 'false'
     }
     triggers {
         githubPush()
@@ -71,7 +72,7 @@ pipeline {
         }
         stage('API Tests') {
             when {
-                expression { ['ci-default', 'api'].contains(params.TEST_PROFILE ?: 'ci-default') }
+                expression { ['ci-default', 'api', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
             }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
@@ -80,34 +81,27 @@ pipeline {
                         sh 'mvn test -Dsurefire.suiteXmlFiles=testNgXmls/api-suite.xml -Dsuite.name=api'
                     }
                     sh 'cp target/surefire-reports/TEST-TestSuite.xml target/surefire-reports/TEST-API-TestSuite.xml'
-                }
-            }
-        }
-        stage('Mobile Tests') {
-            when {
-                expression { params.RUN_MOBILE || ['mobile', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
-            }
-            steps {
-                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
                     script {
-                        withCredentials([string(credentialsId: 'BROWSERSTACK_USERNAME', variable: 'BROWSERSTACK_USERNAME'),
-                                         string(credentialsId: 'BROWSERSTACK_ACCESS_KEY', variable: 'BROWSERSTACK_ACCESS_KEY')]) {
-                            echo 'Running mobile Android and iOS tests on BrowserStack...'
-                            sh "mvn test -Dsurefire.suiteXmlFiles=testNgXmls/mobile.xml -Dbuild.name=\"HealGrid-Mobile-${env.BUILD_NUMBER}\" -Dsuite.name=mobile"
-                        }
+                        env.API_GATE_PASSED = 'true'
                     }
                 }
             }
         }
         stage('Test') {
             when {
-                expression { ['ci-default', 'grid-ui', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
+                expression {
+                    def profile = params.TEST_PROFILE ?: 'ci-default'
+                    if (profile == 'grid-ui') {
+                        return true
+                    }
+                    return ['ci-default', 'full-regression'].contains(profile) && env.API_GATE_PASSED == 'true'
+                }
             }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
                         def profile = params.TEST_PROFILE ?: 'ci-default'
-                        def suiteXml = profile == 'full-regression' ? 'testNgXmls/grid-full-suite.xml' : 'testNgXmls/ui-grid-parallel-classes.xml'
+                        def suiteXml = profile == 'full-regression' ? 'testNgXmls/ui-grid-crossbrowser.xml' : 'testNgXmls/ui-grid-parallel-classes.xml'
                         def suiteName = profile == 'full-regression' ? 'full-regression-grid' : 'grid'
                         echo "Starting Grid + Healenium tests for ${profile}: ${suiteXml}"
                         withEnv(["TEST_SUITE_XMLS=${suiteXml}", "SUITE_NAME=${suiteName}"]) {
@@ -126,9 +120,33 @@ pipeline {
                 }
             }
         }
+        stage('Mobile Tests') {
+            when {
+                expression {
+                    def profile = params.TEST_PROFILE ?: 'ci-default'
+                    def requested = params.RUN_MOBILE || ['mobile', 'full-regression'].contains(profile)
+                    def apiGateRequired = ['ci-default', 'api', 'full-regression'].contains(profile)
+                    return requested && (!apiGateRequired || env.API_GATE_PASSED == 'true')
+                }
+            }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                    script {
+                        withCredentials([string(credentialsId: 'BROWSERSTACK_USERNAME', variable: 'BROWSERSTACK_USERNAME'),
+                                         string(credentialsId: 'BROWSERSTACK_ACCESS_KEY', variable: 'BROWSERSTACK_ACCESS_KEY')]) {
+                            echo 'Running mobile Android and iOS tests on BrowserStack...'
+                            sh "mvn test -Dsurefire.suiteXmlFiles=testNgXmls/mobile.xml -Dbuild.name=\"HealGrid-Mobile-${env.BUILD_NUMBER}\" -Dsuite.name=mobile"
+                        }
+                    }
+                }
+            }
+        }
         stage('Healing Proof') {
             when {
-                expression { ['healing-proof', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
+                expression {
+                    def profile = params.TEST_PROFILE ?: 'ci-default'
+                    return profile == 'healing-proof' || (profile == 'full-regression' && env.API_GATE_PASSED == 'true')
+                }
             }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {

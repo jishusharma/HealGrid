@@ -8,6 +8,22 @@ def parseRerunTests(String reportText) {
         .join(',')
 }
 
+def selectedProfile(params) {
+    return params.TEST_PROFILE ?: 'ci-default'
+}
+
+def apiStageProfiles() {
+    return ['ci-default', 'api', 'full-regression']
+}
+
+def apiGateProfiles() {
+    return ['ci-default', 'full-regression']
+}
+
+def apiTestsPassed() {
+    return fileExists('target/.api-tests-passed')
+}
+
 pipeline {
     agent any
     environment {
@@ -44,7 +60,7 @@ pipeline {
                     rm -rf target/allure-results target/allure-report target/surefire-reports
                     rm -f target/ai-failure-report.json target/allure-history.tar.gz
                     rm -f target/observability/flaky-report.html target/observability/trend-report.html
-                    rm -f target/.api-gate-passed
+                    rm -f target/.api-tests-passed
                     mkdir -p target/allure-results target/surefire-reports/junitreports target/observability
                     touch target/.test-output-start
                 '''
@@ -72,7 +88,7 @@ pipeline {
         }
         stage('API Tests') {
             when {
-                expression { ['ci-default', 'api', 'full-regression'].contains(params.TEST_PROFILE ?: 'ci-default') }
+                expression { apiStageProfiles().contains(selectedProfile(params)) }
             }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
@@ -81,24 +97,24 @@ pipeline {
                         sh 'mvn test -Dsurefire.suiteXmlFiles=testNgXmls/api-suite.xml -Dsuite.name=api'
                     }
                     sh 'cp target/surefire-reports/TEST-TestSuite.xml target/surefire-reports/TEST-API-TestSuite.xml'
-                    sh 'touch target/.api-gate-passed'
+                    sh 'touch target/.api-tests-passed'
                 }
             }
         }
         stage('Test') {
             when {
                 expression {
-                    def profile = params.TEST_PROFILE ?: 'ci-default'
+                    def profile = selectedProfile(params)
                     if (profile == 'grid-ui') {
                         return true
                     }
-                    return ['ci-default', 'full-regression'].contains(profile) && fileExists('target/.api-gate-passed')
+                    return apiGateProfiles().contains(profile) && apiTestsPassed()
                 }
             }
             steps {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
-                        def profile = params.TEST_PROFILE ?: 'ci-default'
+                        def profile = selectedProfile(params)
                         def suiteXml = profile == 'full-regression' ? 'testNgXmls/ui-grid-crossbrowser.xml' : 'testNgXmls/ui-grid-parallel-classes.xml'
                         def suiteName = profile == 'full-regression' ? 'full-regression-grid' : 'grid'
                         echo "Starting Grid + Healenium tests for ${profile}: ${suiteXml}"
@@ -121,10 +137,10 @@ pipeline {
         stage('Mobile Tests') {
             when {
                 expression {
-                    def profile = params.TEST_PROFILE ?: 'ci-default'
+                    def profile = selectedProfile(params)
                     def requested = params.RUN_MOBILE || ['mobile', 'full-regression'].contains(profile)
-                    def apiGateRequired = ['ci-default', 'api', 'full-regression'].contains(profile)
-                    return requested && (!apiGateRequired || fileExists('target/.api-gate-passed'))
+                    def apiGateRequired = apiStageProfiles().contains(profile)
+                    return requested && (!apiGateRequired || apiTestsPassed())
                 }
             }
             steps {
@@ -142,8 +158,8 @@ pipeline {
         stage('Healing Proof') {
             when {
                 expression {
-                    def profile = params.TEST_PROFILE ?: 'ci-default'
-                    return profile == 'healing-proof' || (profile == 'full-regression' && fileExists('target/.api-gate-passed'))
+                    def profile = selectedProfile(params)
+                    return profile == 'healing-proof' || (profile == 'full-regression' && apiTestsPassed())
                 }
             }
             steps {
@@ -166,7 +182,7 @@ pipeline {
         }
         stage('Reporting Validation') {
             when {
-                expression { (params.TEST_PROFILE ?: 'ci-default') == 'reporting-validation' }
+                expression { selectedProfile(params) == 'reporting-validation' }
             }
             steps {
                 catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
@@ -208,7 +224,7 @@ pipeline {
                 script {
                     if (fileExists('target/ai-failure-report.json')) {
                         def rerunTests = parseRerunTests(readFile('target/ai-failure-report.json'))
-                        def profile = params.TEST_PROFILE ?: 'ci-default'
+                        def profile = selectedProfile(params)
                         def localRerunProfiles = ['api', 'reporting-validation']
                         if (rerunTests) {
                             if (localRerunProfiles.contains(profile)) {
